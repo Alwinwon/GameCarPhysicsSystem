@@ -1,0 +1,2 @@
+# CarPhysics
+This project focuses on the development of a realistic custom car physics system tailored for racing and open-world driving game. The core objective of this project is to create an accurate, responsive and highly immersive vehicle handling model that specifically for an Electric Vehicle (EV). It is developed using Unity 6 with Wheel Collider.
