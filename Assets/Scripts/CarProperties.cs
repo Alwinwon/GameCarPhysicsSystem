@@ -21,9 +21,9 @@ public class CarProperties : MonoBehaviour
   public float wheelMass = 20;
   [Tooltip("Radius of wheel (m).")]
   public float wheelRadius = 0.45f;
-  [Tooltip("Max steering angle at rest.")]
+  [Tooltip("Max steering angle at rest (degrees).")]
   public float turnAngle = 30f;
-  [Tooltip("Max steering angle at max speed.")]
+  [Tooltip("Max steering angle at max speed (degrees).")]
   public float turnAngleAtMaxSpeed = 15f;
   [Tooltip("Tire friction factor.")]
   public float tireFriction = 1f;
@@ -65,6 +65,9 @@ public class CarProperties : MonoBehaviour
       Debug.Log("CarProperties: Rigidbody not found on this GameObject. Please add a Rigidbody.");
       return;
     }
+
+    // Lock & hide cursor
+    Cursor.lockState = CursorLockMode.Locked;
   }
 
   // Update is called once per frame
