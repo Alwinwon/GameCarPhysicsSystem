@@ -81,7 +81,7 @@ public class WheelController : MonoBehaviour
     float slip = Mathf.Abs(hit.forwardSlip) + Mathf.Abs(hit.sidewaysSlip);
 
     // DEBUGGING
-    //Debug.Log($"Slip: {currentSlip}");
+    //Debug.Log($"Slip: {slip}");
 
     if (slip > slipAllowance)
     {
@@ -91,7 +91,7 @@ public class WheelController : MonoBehaviour
       // Modify the number of particle over a distance (More Slipping = Heavier Smoke)
       emission.rateOverDistance = 3 * slip;
       // Use-case: Driving against a wall creates lot of skid smoke
-      if (forwardSpeed < 0.001f) emission.rateOverTime = 6 * slip;
+      if (forwardSpeed < 0.1f) emission.rateOverTime = 6 * slip;
       else emission.rateOverTime = 0f;
       // Trigger skid smoke
       if (!skidSmoke.isPlaying) skidSmoke.Play();

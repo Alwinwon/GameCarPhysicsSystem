@@ -1,6 +1,4 @@
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 public class AudioController : MonoBehaviour
 {
@@ -58,7 +56,6 @@ public class AudioController : MonoBehaviour
   // For Variables
   float speedFactor;
   float powerFactor;
-  float torqueFactor;
   float moveInput;
   float hornInput;
 
@@ -148,12 +145,12 @@ public class AudioController : MonoBehaviour
 
     // PITCH
     // Modify pitch as the car accelerates
-    float targetPitch = Mathf.Lerp(minMotorPitch, maxMotorPitch, powerFactor);
+    float targetPitch = Mathf.Lerp(minMotorPitch, maxMotorPitch, speedFactor);
     motorHum.pitch = Mathf.Lerp(motorHum.pitch, targetPitch, motorPitchDamping);
 
     // VOLUME
     // Modify volume as the car powers
-    float targetVolume = maxMotorVolume * torqueFactor;
+    float targetVolume = maxMotorVolume * powerFactor;
     motorHum.volume = Mathf.Lerp(motorHum.volume, targetVolume, motorVolumeDamping);
 
     // DEBUGGING
@@ -210,10 +207,9 @@ public class AudioController : MonoBehaviour
   }
 
   // Called by CarController to update data
-  public void DataUpdate(float speed, float power, float torque)
+  public void DataUpdate(float speed, float power)
   {
     speedFactor = speed;
     powerFactor = power;
-    torqueFactor = torque;
   }
 }

@@ -43,7 +43,7 @@ public class CameraController : MonoBehaviour
   // For Variables
   float hInput;
   float vInput;
-  float speedFactor;
+  float actualSpeedFactor;
 
   // Reference to the input system
   CarInputActions carControls;
@@ -133,13 +133,13 @@ public class CameraController : MonoBehaviour
     transform.position = car.position;
 
     // Auto rotate (yaw) back if car is moving and no hInput
-    if (speedFactor > 0.001f && hInput == 0f)
+    if (actualSpeedFactor > 0.001f && hInput == 0f)
     {
       // Calculation of signed delta angle [0, 360]
       float yawDeltaAngle = Mathf.DeltaAngle(yaw, car.rotation.eulerAngles.y);
 
       // Calculation of auto yaw rotation [0, 360]
-      yaw += yawDeltaAngle * speedFactor * autoRotateSensitivity;
+      yaw += yawDeltaAngle * actualSpeedFactor * autoRotateSensitivity;
       yaw = ((yaw + 180) % 360) - 180; // Normalization of angle formula [-180, 180]
     }
 
@@ -149,7 +149,7 @@ public class CameraController : MonoBehaviour
     transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, orbitDamping);
 
     // Dynamic offset from the car
-    float dynamicDistance = Mathf.Lerp(offset.z, offset.z - maxDynamicDistance, speedFactor);
+    float dynamicDistance = Mathf.Lerp(offset.z, offset.z - maxDynamicDistance, actualSpeedFactor);
     Vector3 camPos = new Vector3(offset.x, offset.y, dynamicDistance); // Local camera position
 
     // Using raycast to detect and avoid camera collision (ignoring Car LayerMask)
@@ -210,6 +210,6 @@ public class CameraController : MonoBehaviour
   // Called by CarController to update data
   public void DataUpdate(float speed)
   {
-    speedFactor = speed;
+    actualSpeedFactor = speed;
   }
 }

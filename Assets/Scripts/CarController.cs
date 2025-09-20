@@ -8,26 +8,16 @@ public class CarController : MonoBehaviour
 
   [Header("Chassis")]
   [Tooltip("Laden mass of the car (kg), excluding wheels.")]
+  [Range(1000f, 10000f)]
   [SerializeField] float ladenMass = 1851f + 80f; // Includes 80kg driver
+  [Range(-0.5f, 0.5f)]
   [Tooltip("Mass offset of the center of gravity of the car.")]
   [SerializeField] float centreOfGravityOffset = -0.5f;
-
-  [Header("Wheels")]
-  [Tooltip("Mass of wheel (kg).")]
-  [SerializeField] float wheelMass = 20;
-  [Tooltip("Radius of wheel (m).")]
-  [SerializeField] float wheelRadius = 0.45f;
-  [Tooltip("Maximum steering angle at rest (degrees).")]
-  [SerializeField] float TurnAngle = 30f;
-  [Tooltip("Maximum steering angle at max speed (degrees).")]
-  [SerializeField] float TurnAngleAtMaxSpeed = 15f;
-  [Tooltip("Tire friction factor.")]
-  [SerializeField] float tireFriction = 1f;
 
   [Header("Motors & Brakes")]
   [Tooltip("Select type of drivetrain.")]
   [SerializeField] Drivetrain drivetrain = Drivetrain.AWD;
-  [Tooltip("Max torque of front motor (Nm).")]
+  [Tooltip("Max torque of front motor (Nm) - No traction control.")]
   [Range(100f, 1000f)]
   [SerializeField] float frontMotorTorque = 219f;
   [Tooltip("Max RPM for peak torque of front motor.")]
@@ -39,7 +29,7 @@ public class CarController : MonoBehaviour
   [Tooltip("Gear ratio of front single-speed transmission (e.g. If 9:1, input '9').")]
   [Range(1, 12)]
   [SerializeField] float frontGearRatio = 9.03f;
-  [Tooltip("Max torque of rear motor (Nm).")]
+  [Tooltip("Max torque of rear motor (Nm) - No traction control.")]
   [Range(100f, 1000f)]
   [SerializeField] float rearMotorTorque = 340f;
   [Tooltip("Max RPM for peak torque of rear motor.")]
@@ -57,31 +47,62 @@ public class CarController : MonoBehaviour
   //[Tooltip("Driver assist allows the game to automatically reduce the speed as the car accelerates.")]
   //[SerializeField] bool driverAssist = false;
 
+  [Header("Wheels")]
+  [Tooltip("Mass of wheel (kg).")]
+  [Range(20f, 20f)]
+  [SerializeField] float wheelMass = 20;
+  [Tooltip("Radius of wheel with tire (m).")]
+  [Range(0.4075898f, 0.4075898f)]
+  [SerializeField] float wheelRadius = 0.4075898f;
+  [Tooltip("Maximum steering angle at rest (degrees).")]
+  [Range(1f, 60f)]
+  [SerializeField] float TurnAngle = 30f;
+  [Tooltip("Maximum steering angle at max speed (degrees).")]
+  [Range(1f, 60f)]
+  [SerializeField] float TurnAngleAtMaxSpeed = 15f;
+  [Tooltip("Tire friction factor.")]
+  [Range(0.1f, 10f)]
+  [SerializeField] float tireFriction = 1f;
+
   [Header("Suspensions")]
-  [Tooltip("Maximum extension length of suspensions (m).")]
+  [Tooltip("Maximum allowable displacement of suspension within car's wheel well (m).")]
+  [Range(0f, 0.3f)]
+  [SerializeField] float allowSuspensionDisplacement = 0.3f;
+  [Tooltip("Maximum distance of suspension (m).")]
+  [Range(0f, 1f)]
   [SerializeField] float suspensionDistance = 0.3f;
   [Tooltip("Spring constant, k (N/m)")]
+  [Range(10000f, 100000f)]
   [SerializeField] float stiffness = 25000f;
   [Tooltip("Damping coefficient, c (Ns/m)")]
+  [Range(1000f, 10000f)]
   [SerializeField] float dampening = 2500f;
 
   [Header("Aerodynamics")]
   [Tooltip("Air density (p), default according to ISA (kg/m3).")]
   [SerializeField] float airDensity = 1.225f;
   [Tooltip("Estimated total front area (A) of the car (m2).")]
-  [SerializeField] float frontArea = 0.2f;
+  [SerializeField] float frontArea = 2.7f;
   [Tooltip("Estimated total front drag coefficient (Cd) of the car.")]
-  [SerializeField] float frontDragCoefficient = 2.7f;
+  [SerializeField] float frontDragCoefficient = 0.2f;
   [Tooltip("Estimated total side areas (A) of the car (m2).")]
-  [SerializeField] float sideAreas = 0.6f;
+  [SerializeField] float sideAreas = 6.8f;
   [Tooltip("Estimated total side drag coefficient (Cd) of the car.")]
-  [SerializeField] float sideDragCoefficient = 6.8f;
+  [SerializeField] float sideDragCoefficient = 0.6f;
   [Tooltip("Estimated total rear area (A) of the car (m2).")]
-  [SerializeField] float rearArea = 0.3f;
+  [SerializeField] float rearArea = 2.7f;
   [Tooltip("Estimated total rear drag coefficient (Cd) of the car.")]
-  [SerializeField] float rearDragCoefficient = 2.7f;
-  [Tooltip("Scales drag increase due to yaw rate.")]
-  [SerializeField] private float yawDragMultiplier = 0.1f;
+  [SerializeField] float rearDragCoefficient = 0.3f;
+  [Tooltip("Scales drag increase according to yaw rate.")]
+  [SerializeField] float yawDragMultiplier = 0.1f;
+  [Tooltip("Estimated total influence area (A) of lift/downforce accessories of the car (m2).")]
+  [SerializeField] float influenceArea = 2.7f;
+  [Tooltip("Estimated total front axle lift(+)/downforce(-) coefficient (Cl) of the car.")]
+  [SerializeField] float frontLiftDownforceCoefficieint = 0.05f; // Positive for lift
+  [Tooltip("Estimated total rear axle lift(+)/downforce(-) coefficient (Cl) of the car.")]
+  [SerializeField] float rearLiftDownforceCoefficieint = -0.2f; // Negative for downforce (lip spoiler)
+  [Tooltip("Estimated total rolling resistance coefficient (Crr) of each wheel.")]
+  [SerializeField] float rollingResistanceCoefficient = 0.015f;
 
   [Header("Link Camera")]
   [Tooltip("Assign CameraController to link the camera to the CarController.")]
@@ -100,9 +121,12 @@ public class CarController : MonoBehaviour
   float brakeInput;
   float maxSpeed;
   float speedFactor;
+  float actualSpeedFactor;
   float powerFactor;
   float torqueFactor;
   float forwardSpeed;
+  float rbSpeed;
+  float[] previousSuspensionDisplacement = new float[4];
 
   // Reference to the new input system
   CarInputActions carControls;
@@ -138,6 +162,9 @@ public class CarController : MonoBehaviour
     audioController = GetComponent<AudioController>();
     wheels = GetComponentsInChildren<WheelController>();
 
+    //// Smooths sub-frame movement
+    //rb.interpolation = RigidbodyInterpolation.Interpolate;
+
     // Ensure WheelController.wheelCollider is initialized before calling it
     // (?) Otherwise, UnassignedReferenceException as both Start() runs simultaneously.
     // (!) Explicitly initialize it before it is being called in Setup() -> WheelSetup()
@@ -163,8 +190,8 @@ public class CarController : MonoBehaviour
   {
     ChassisSetup();
     WheelSetup();
-    DrivetrainSetup();
     SuspensionSetup();
+    DrivetrainSetup();
   }
 
   void ChassisSetup()
@@ -185,15 +212,42 @@ public class CarController : MonoBehaviour
       // Assign wheelCollider carProperties for each wheel
       wheel.wheelCollider.mass = wheelMass;
       wheel.wheelCollider.radius = wheelRadius;
+    }
+  }
 
+  void SuspensionSetup()
+  {
+    foreach (var wheel in wheels)
+    {
       // Assign suspension distance
       wheel.wheelCollider.suspensionDistance = suspensionDistance;
       // Adjust ride height to half of the suspension distance in both direction (up/down)
-      // (?) Ride height calculation works in the opposite as if locally positioned lower to increase height
-      // (!) Wheel size is constant
+      // (?) Ride height stays constant by increasing the suspension's y-axis position (by half) into the wheel well
+      //     until it reaches the wheel well's allowable suspension displacement. From there, its position will remain
+      //     at the same maximum allowable position where the wheel will extend lower downwards increasing the ride height.
+      // (!) Wheel size is constant with the model size
       wheel.transform.localPosition = new Vector3(wheel.transform.localPosition.x,
-                                                  0.7075898f - suspensionDistance / 2,
+                                                  wheelRadius +
+                                                  Mathf.Min(suspensionDistance, allowSuspensionDisplacement) / 2,
                                                   wheel.transform.localPosition.z);
+
+      // Get the current suspension spring settings
+      JointSpring spring = wheel.wheelCollider.suspensionSpring;
+      // Modify the spring & damper values
+      spring.spring = stiffness;
+      spring.damper = dampening;
+      // Apply the modified settings back to the wheel collider
+      wheel.wheelCollider.suspensionSpring = spring;
+
+      // Get the current friction settings
+      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
+      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
+      // Modify the stiffness values
+      frontFriction.stiffness = tireFriction;
+      sideFriction.stiffness = tireFriction;
+      // Apply the modified settings back to the wheel collider
+      wheel.wheelCollider.forwardFriction = frontFriction;
+      wheel.wheelCollider.sidewaysFriction = sideFriction;
     }
   }
 
@@ -225,29 +279,6 @@ public class CarController : MonoBehaviour
       }
     }
   }
-  void SuspensionSetup()
-  {
-    foreach (var wheel in wheels)
-    {
-      // Get the current suspension spring settings
-      JointSpring spring = wheel.wheelCollider.suspensionSpring;
-      // Modify the spring & damper values
-      spring.spring = stiffness;
-      spring.damper = dampening;
-      // Apply the modified settings back to the wheel collider
-      wheel.wheelCollider.suspensionSpring = spring;
-
-      // Get the current friction settings
-      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
-      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
-      // Modify the stiffness values
-      frontFriction.stiffness = tireFriction;
-      sideFriction.stiffness = tireFriction;
-      // Apply the modified settings back to the wheel collider
-      wheel.wheelCollider.forwardFriction = frontFriction;
-      wheel.wheelCollider.sidewaysFriction = sideFriction;
-    }
-  }
 
   // FixedUpdate is called once per fixed time frame
   void FixedUpdate()
@@ -255,7 +286,7 @@ public class CarController : MonoBehaviour
     DrivingInput();
     Steering();
     MotorsBrakes();
-    AerodynamicResistance();
+    AerodynamicForces();
     DataUpdateComponents();
   }
 
@@ -275,7 +306,7 @@ public class CarController : MonoBehaviour
     brakeInput = carControls.Car.Brake.ReadValue<float>();
 
     // DEBUGGING
-    Debug.Log($"Turning: X = {vInput}, Y = {hInput}; Move = {moveInput}, Brake = {brakeInput}");
+    Debug.Log($"Turning - X: {vInput}, Y: {hInput}; Move: {moveInput}, Brake: {brakeInput}");
   }
 
   void Steering()
@@ -305,193 +336,235 @@ public class CarController : MonoBehaviour
   // Fix Acc/Reverse Sensitivity to Prevent Stalling
   void MotorsBrakes()
   {
-    //// Calculate the current average RPM from all wheels
-    //float averageWheelRPM = 0f;
-    //foreach (var wheel in wheels)
-    //{
-    //  averageWheelRPM += wheel.wheelCollider.rpm;
-    //}
-    //averageWheelRPM /= wheels.Length;
+    // Calculate the current average RPM from all wheels
+    // (!) Bug - Using Wheel Collider's RPM causes stutters
+    float averageWheelRPM = 0f;
+    foreach (var wheel in wheels)
+    {
+      averageWheelRPM += wheel.wheelCollider.rpm;
+    }
+    averageWheelRPM /= wheels.Length;
 
-    //// Calculate the current speed based on current average wheel rotation
-    //// (RPM * Wheel Circumference in KM * 60 mins)
-    //float currentSpeed = averageWheelRPM * (Mathf.PI * (wheelRadius * 2 / 1000)) * 60;
+    // Calculate the current speed based on current average wheel rotation (km/h)
+    // (RPM * Wheel Circumference in KM * 60 mins)
+    float currentSpeed = averageWheelRPM * (Mathf.PI * (wheelRadius * 2 / 1000)) * 60;
 
-    //// Calculate the average max speed based on max average wheel rotation
-    //// (RPM * Wheel Circumference in KM * 60 mins)
-    //float averageMaxMotorRPM = (frontMaxMotorRPM + rearMaxMotorRPM) / 2;
-    //float averageGearRatio = (frontGearRatio + rearGearRatio) / 2;
-    //maxSpeed = (averageMaxMotorRPM / averageGearRatio) * (Mathf.PI * wheelRadius * 2 / 1000) * 60;
+    // Calculate the average max speed based on max average wheel rotation (km/h)
+    // (RPM * Wheel Circumference in KM * 60 mins)
+    float averageMaxMotorRPM = (frontMaxMotorRPM + rearMaxMotorRPM) / 2;
+    float averageGearRatio = (frontGearRatio + rearGearRatio) / 2;
+    maxSpeed = (averageMaxMotorRPM / averageGearRatio) * (Mathf.PI * wheelRadius * 2 / 1000) * 60;
 
-    //// Normalize speed factor of the wheels
-    //speedFactor = Mathf.Clamp01(Mathf.InverseLerp(0, maxSpeed, currentSpeed));
+    // Normalize speed factor of the wheels
+    speedFactor = Mathf.Clamp01(Mathf.InverseLerp(0, maxSpeed, currentSpeed));
 
-    ////// Get the current torque
-    ////float currentMotorTorque = motorTorqueCurve.Evaluate(averageMotorRPM);
+    //// Get the current torque (superseded - less dynamic)
+    //float currentMotorTorque = motorTorqueCurve.Evaluate(averageMotorRPM);
 
-    //// Calculation to simulate the motor torque curve
-    //// Normalize the power curve (Clamp motor power once reached max motor rpm at peak torque)
-    //float motorRPM = (frontMotorRPM + rearMotorRPM) / 2;
-    //float currentMotorRPM = averageWheelRPM * averageGearRatio;
-    //powerFactor = Mathf.Clamp01(Mathf.InverseLerp(0, motorRPM, currentMotorRPM));
-    //// Normalize end of the torque curve after reaching max power
-    //float frontMotorTorqueFactor = Mathf.Clamp01(Mathf.InverseLerp(frontMaxMotorRPM, frontMotorRPM, currentMotorRPM));
-    //float rearMotorTorqueFactor = Mathf.Clamp01(Mathf.InverseLerp(rearMaxMotorRPM, rearMotorRPM, currentMotorRPM));
-    //torqueFactor = (frontMotorTorqueFactor + rearMotorTorqueFactor) / 2; // Average torque factor of the motors
-    //// Range mapping the RPM with the torque
-    //float currentFrontMotorTorque = Mathf.Lerp(0, frontMotorTorque, frontMotorTorqueFactor);
-    //float currentRearMotorTorque = Mathf.Lerp(0, rearMotorTorque, rearMotorTorqueFactor);
+    // Calculation to simulate the motor torque curve
+    // Normalize the power curve (Clamp motor power once reached max motor rpm at peak torque)
+    float motorRPM = (frontMotorRPM + rearMotorRPM) / 2;
+    float currentMotorRPM = averageWheelRPM * averageGearRatio;
+    powerFactor = Mathf.Clamp01(Mathf.InverseLerp(0, motorRPM, currentMotorRPM));
+    // Normalize end of the torque curve after reaching max power
+    float frontMotorTorqueFactor = Mathf.Clamp01(Mathf.InverseLerp(frontMaxMotorRPM,
+                                                                   frontMotorRPM,
+                                                                   currentMotorRPM));
+    float rearMotorTorqueFactor = Mathf.Clamp01(Mathf.InverseLerp(rearMaxMotorRPM,
+                                                                  rearMotorRPM,
+                                                                  currentMotorRPM));
+    torqueFactor = (frontMotorTorqueFactor + rearMotorTorqueFactor) / 2; // Average torque factor of the motors
+    // Range mapping the RPM with the torque
+    float currentFrontMotorTorque = Mathf.Lerp(0, frontMotorTorque, frontMotorTorqueFactor);
+    float currentRearMotorTorque = Mathf.Lerp(0, rearMotorTorque, rearMotorTorqueFactor);
 
-    //// Calculate actual current speed along the car's rigidbody forward axis (direction of travel)
-    //// And converting m/s to km/h by multiplying 3600/1000
-    //forwardSpeed = Vector3.Dot(transform.forward, rb.linearVelocity) * 3.6f;
+    // Calculate actual current speed along the car's rigidbody forward axis (direction of travel)
+    // And converting m/s to km/h by multiplying 3600/1000
+    forwardSpeed = Vector3.Dot(transform.forward, rb.linearVelocity) * 3.6f;
 
-    //// DEBUGGING
-    //Debug.Log($"Speedometer Speed (km/h): {currentSpeed}, Actual Speed (km/h): {forwardSpeed}");
+    // Normalize actual speed factor of the wheels
+    actualSpeedFactor = Mathf.Clamp01(Mathf.InverseLerp(0, maxSpeed, forwardSpeed));
+
+    // DEBUGGING
+    Debug.Log($"Speedometer Speed (km/h): {currentSpeed}, Actual Speed (km/h): {forwardSpeed}");
     //Debug.Log($"Average Motor RPM: {currentMotorRPM}");
     //Debug.Log($"Front Torque (Nm): {currentFrontMotorTorque}, Rear Torque (Nm): {currentRearMotorTorque}");
     //Debug.Log($"Speed Factor: {speedFactor}, Power Factor: {powerFactor}, Torque Factor: {torqueFactor}");
-
-    //// Determine if the player is accelerating or trying to reverse
-    //bool isAccelerating = Mathf.Sign(moveInput) == Mathf.Sign(forwardSpeed);
-
-    //foreach (var wheel in wheels)
-    //{
-    //  // Initialize local variables
-    //  float wheelTorque = 0f;
-    //  float brakepadTorque = 0f;
-    //  float brakepadTorque_Move = 0f;
-    //  float brakepadTorque_Brake = 0f;
-
-    //  if (isAccelerating)
-    //  {
-    //    // Apply torque to motorized wheels
-    //    if (wheel.motorized)
-    //    {
-    //      if (wheel.gameObject.tag == "FrontWheel")
-    //      {
-    //        wheelTorque = moveInput * (currentFrontMotorTorque / 2) * frontGearRatio; // Per Wheel
-    //      }
-    //      else if (wheel.gameObject.tag == "RearWheel")
-    //      {
-    //        wheelTorque = moveInput * (currentRearMotorTorque / 2) * rearGearRatio; // Per Wheel
-    //      }
-    //    }
-    //    // Release brakes when accelerating
-    //    brakepadTorque_Move = 0f;
-    //  }
-    //  else
-    //  {
-    //    // Release torque
-    //    wheelTorque = 0f;
-    //    // Apply brakes when reversing direction
-    //    brakepadTorque_Move = Mathf.Abs(moveInput) * brakeTorque;
-    //  }
-    //  // Apply brakes to stop (dedicated brake input)
-    //  brakepadTorque_Brake = brakeInput * brakeTorque;
-    //  // Choose the highest value between the brakes inputs
-    //  brakepadTorque = Mathf.Max(brakepadTorque_Move, brakepadTorque_Brake);
-
-    //  // Apply to WheelColliders
-    //  wheel.wheelCollider.motorTorque = wheelTorque;
-    //  wheel.wheelCollider.brakeTorque = brakepadTorque;
-    //}
-
-    Apply torque to motors
-
-    // LESS REALISTIC - BASED ON CAR's RB Velocity
-    // Calculate current speed along the car's forward axis (direction of travel)
-    // And converting m/s to km/h by multiplying 3600/1000
-    float forwardSpeed = Vector3.Dot(transform.forward, rb.linearVelocity) * 3.6f;
-    //// Normalize speed factor
-    //speedFactor = Mathf.InverseLerp(0, maxSpeed, Mathf.Abs(wheelSpeed));
-    //// Reduce motor torque and steering at high speeds for better handling (Range Mapper)
-    //float currentMotorTorque = Mathf.Lerp(motorTorque, 0, speedFactor);
-
-    //// DEBUGGING
-    //Debug.Log($"Speed (km/h): {rb.linearVelocity.magnitude * 3.6f}");
-
-    //// Determine if the player is accelerating or trying to reverse
-    //bool isAccelerating = Mathf.Sign(moveInput) == Mathf.Sign(forwardSpeed);
-
-    // MORE REALISTIC
-    // Speedometer works by counting the average wheel rotation from sensors
-    float totalAngularVelocity = 0;
-    float wheelCount = 0;
-    foreach (var wheel in wheels)
-    {
-      // Get the angular velocity (rotation speed) for each wheel (Degrees/s)
-      totalAngularVelocity += wheel.wheelCollider.rotationSpeed;
-      wheelCount++;
-    }
-    // Calculate the average rotation speed from Degree/s to Radian/s (360 degrees = 2 * PI rad)
-    float averageAngularVelocity = (totalAngularVelocity / (wheelCount + 1)) * Mathf.PI * 180;
-    // Convert angular velocity (rad/s) to linear velocity (m/s) using v = w * r
-    // And converting m/s to km/h by multiplying 3600/1000
-    float linearVelocity = (averageAngularVelocity * wheelRadius) * 3.6f;
-
-    // Normalize speed factor
-    speedFactor = Mathf.InverseLerp(0, maxSpeed, Mathf.Abs(forwardSpeed));
-    // Reduce motor torque and steering at high speeds for better handling (Range Mapper)
-    float currentMotorTorque = Mathf.Lerp(motorTorque, 0, speedFactor);
-
-    // DEBUGGING
-    Debug.Log($"Speed (km/h): {rb.linearVelocity.magnitude * 3.6f}; Speedometer (km/h): {linearVelocity}");
-    Debug.Log($"Forward Speed (km/h): {forwardSpeed}");
 
     // Determine if the player is accelerating or trying to reverse
     bool isAccelerating = Mathf.Sign(moveInput) == Mathf.Sign(forwardSpeed);
 
     foreach (var wheel in wheels)
     {
-      float targetBrakeTorque_Move = 0;
-      float targetBrakeTorque_Brake = 0;
+      // Initialize local variables
+      float wheelTorque = 0f;
+      float brakepadTorque = 0f;
+      float brakepadTorque_Move = 0f;
+      float brakepadTorque_Brake = 0f;
 
       if (isAccelerating)
       {
         // Apply torque to motorized wheels
         if (wheel.motorized)
         {
-          targetMotorTorque = moveInput * currentMotorTorque;
+          if (wheel.gameObject.tag == "FrontWheel")
+          {
+            // Per wheel of axle motor
+            wheelTorque = moveInput * frontGearRatio * (currentFrontMotorTorque / 2);
+          }
+          else if (wheel.gameObject.tag == "RearWheel")
+          {
+            // Per wheel of axle motor
+            wheelTorque = moveInput * rearGearRatio * (currentRearMotorTorque / 2);
+          }
         }
         // Release brakes when accelerating
-        targetBrakeTorque = 0f;
+        brakepadTorque_Move = 0f;
       }
       else
       {
         // Release torque
-        targetMotorTorque = 0f;
+        wheelTorque = 0f;
         // Apply brakes when reversing direction
-        targetBrakeTorque_Move = Mathf.Abs(moveInput) * brakeTorque;
+        brakepadTorque_Move = Mathf.Abs(moveInput) * brakeTorque;
       }
       // Apply brakes to stop (dedicated brake input)
-      targetBrakeTorque_Brake = brakeInput * brakeTorque;
+      brakepadTorque_Brake = brakeInput * brakeTorque;
       // Choose the highest value between the brakes inputs
-      targetBrakeTorque = Mathf.Max(targetBrakeTorque_Move, targetBrakeTorque_Brake);
+      brakepadTorque = Mathf.Max(brakepadTorque_Move, brakepadTorque_Brake);
 
       // Apply to WheelColliders
-      wheel.wheelCollider.motorTorque = targetMotorTorque;
-      wheel.wheelCollider.brakeTorque = targetBrakeTorque;
+      wheel.wheelCollider.motorTorque = wheelTorque;
+      wheel.wheelCollider.brakeTorque = brakepadTorque;
+
+      // DEBUGGING
+      //Debug.Log($"Motor Torque: {wheelTorqu e}, Brake Torque: {brakepadTorque}");
     }
   }
-
 
   // Wheel included affected
   // Applying the quadratic drag formula: Fd = -0.5 * p * Cd * A * v2
   // Unity drag unit is 1/sec (inverse seconds); ForceMode.Force is in (N) as with Drag
   // Ensure to set the drag of the rigidbody to zero as we're adding custom forces in different directions
-  void AerodynamicResistance()
+  void AerodynamicForces()
   {
+    // Disable rigidbody's drag
+    rb.linearDamping = 0f;
+    rb.angularDamping = 0f;
 
+    // Rigidbody's magnitude of velocity (m/s)
+    rbSpeed = rb.linearVelocity.magnitude;
+
+    FrictionDrag();
+    LiftDownforce();
+    RollingResistance();
+  }
+
+  void FrictionDrag()
+  {
+    // Get the angle between the car object's forward dir and RB's velocity dir
+    // NOTE: "transform" is for local axis while "vector3" is gor global axis
+    float signedAngle = Vector3.SignedAngle(transform.forward, // Direction of the car
+                                            rb.linearVelocity.normalized, // Direction of velocity
+                                            Vector3.up); // Relative to global y-axis
+    float absAngle = Mathf.Abs(signedAngle); // Only magnitude of angle
+
+    // Interpolate Cd and A
+    float Cd, A;
+    if (absAngle <= 90f)
+    {
+      float t = absAngle / 90f; // 0 is front, 1 is side
+      Cd = Mathf.Lerp(frontDragCoefficient, sideDragCoefficient, t);
+      A = Mathf.Lerp(frontArea, sideAreas, t);
+    }
+    else
+    {
+      float t = (absAngle - 90f) / 90f; // 0 is side, 1 is rear
+      Cd = Mathf.Lerp(sideDragCoefficient, rearDragCoefficient, t);
+      A = Mathf.Lerp(sideAreas, rearArea, t);
+    }
+
+    // Apply drag equation (Fd = 0.5 * p * Cd * A * v2)
+    float dragMagnitude = 0.5f * airDensity * Cd * A * rbSpeed * rbSpeed;
+
+    // Yaw drag multiplier - when cornering
+    float yawRate = Mathf.Abs(rb.angularVelocity.y);
+    dragMagnitude *= 1f + yawRate * yawDragMultiplier;
+
+    // Applying drag to the car in the opposite direction of velocity
+    Vector3 dragForce = -rb.linearVelocity.normalized * dragMagnitude;
+    rb.AddForce(dragForce);
+
+    // DEBUGGING
+    Debug.Log($"Total Drag (N): {dragMagnitude}");
+  }
+
+  void LiftDownforce()
+  {
+    // Apply lift/downforce equation (Fd = 0.5 * p * Cl * A * v2)
+    float liftMagnitude = 0.5f * airDensity * influenceArea * rbSpeed * rbSpeed;
+    Vector3 frontLiftForce = Vector3.up * liftMagnitude * frontLiftDownforceCoefficieint;
+    Vector3 rearLiftForce = Vector3.up * liftMagnitude * rearLiftDownforceCoefficieint;
+
+    // Apply lift/downforce forces to front and rear axles relative to midpoint of car
+    Vector3 frontAxle = new Vector3(0f, 0f, 1.739395f);
+    Vector3 rearAxle = new Vector3(0f, 0f, -1.572661f);
+    // NOTE: Position is in world coordinates
+    rb.AddForceAtPosition(frontLiftForce, transform.position + frontAxle);
+    rb.AddForceAtPosition(rearLiftForce, transform.position + rearAxle);
+
+    // DEBUGGING
+    Debug.Log($"Total Lift/Downforce - Front (N): {frontLiftForce}, Rear (N): {rearLiftForce}");
+  }
+
+  void RollingResistance()
+  {
+    for (int i = 0; i < previousSuspensionDisplacement.Length; i++)
+    {
+      // Get current suspension compression/extension
+      if (wheels[i].wheelCollider.GetGroundHit(out WheelHit hit))
+      {
+        // Calculate current suspension distance
+        float distanceToGround = wheels[i].wheelCollider.transform.position.y - hit.point.y;
+        // Calculate suspension displacement length from the midpoint (how much the spring is pushed in)
+        float suspensionDisplacement = (wheelRadius + suspensionDistance / 2) - distanceToGround;
+
+        // Using Hooke's Law (F = -k * x) to calculate the force applied by the spring stiffness & dampening
+        // (?) The suspension displacement will reflect on the car's laden weight and any lift/downforce
+        float springForce = stiffness * suspensionDisplacement;
+        // Calculate suspension velocity (how fast the suspension is rebounding)
+        float susVelocity = (distanceToGround - previousSuspensionDisplacement[i]) / Time.fixedDeltaTime;
+        // Calculate damping force (F = -c * v), opposing force
+        float dampingForce = dampening * susVelocity;
+        // Calculate total suspension force by combining spring & damping forces
+        // (?) Clamp to 0 since spring's force tries to move upwards if it extend downwards beyond midpoint,
+        //     thus no rolling resistance since no force pushing against the ground especially if the car lifts up
+        float totalSusForce = Mathf.Max(0, springForce + dampingForce);
+
+        // For damping force calculation
+        previousSuspensionDisplacement[i] = distanceToGround;
+
+        // Apply rolling resistance equation (Frr = Crr * Fn)
+        float rollingMagnitude = rollingResistanceCoefficient * totalSusForce;
+
+        // Applying rolling resistance to the front tire's contact point
+        Vector3 rollingForce = -rb.linearVelocity.normalized * rollingMagnitude;
+        // NOTE: Position is in world coordinates
+        rb.AddForceAtPosition(rollingForce, hit.point);
+
+        // DEBUGGING
+        Debug.Log($"Spring Force (N): {springForce}, Damping Force: {dampingForce},Rolling Resistance Force (N): {rollingMagnitude}");
+      }
+    }
   }
 
   // Let CarController script update only the necessary data to other scripts
   // Keep it's data private
   void DataUpdateComponents()
   {
-    camController.DataUpdate(speedFactor);
+    camController.DataUpdate(actualSpeedFactor);
     collisionController.DataUpdate(maxSpeed);
-    audioController.DataUpdate(speedFactor, powerFactor, torqueFactor);
+    audioController.DataUpdate(speedFactor, powerFactor);
     foreach (var wheel in wheels)
     {
       wheel.DataUpdate(forwardSpeed);
