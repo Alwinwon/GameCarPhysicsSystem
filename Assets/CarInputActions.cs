@@ -135,6 +135,24 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Unstuck"",
+                    ""type"": ""Button"",
+                    ""id"": ""b57eb4a9-d712-40c4-9edd-6d3932e7f844"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""StatsToggle"",
+                    ""type"": ""Button"",
+                    ""id"": ""6f3c4441-6700-4d40-95c4-5eed4539e9ba"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -258,6 +276,28 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""Horn"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""82db6126-25f4-40ff-8799-984bd4e08ce9"",
+                    ""path"": ""<Keyboard>/e"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""Unstuck"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""99281bb4-ca81-4348-bd70-b4a9f82676a0"",
+                    ""path"": ""<Keyboard>/q"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": """",
+                    ""action"": ""StatsToggle"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -271,6 +311,8 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
         m_Car_Brake = m_Car.FindAction("Brake", throwIfNotFound: true);
         m_Car_Looking = m_Car.FindAction("Looking", throwIfNotFound: true);
         m_Car_Horn = m_Car.FindAction("Horn", throwIfNotFound: true);
+        m_Car_Unstuck = m_Car.FindAction("Unstuck", throwIfNotFound: true);
+        m_Car_StatsToggle = m_Car.FindAction("StatsToggle", throwIfNotFound: true);
     }
 
     ~@CarInputActions()
@@ -356,6 +398,8 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Car_Brake;
     private readonly InputAction m_Car_Looking;
     private readonly InputAction m_Car_Horn;
+    private readonly InputAction m_Car_Unstuck;
+    private readonly InputAction m_Car_StatsToggle;
     /// <summary>
     /// Provides access to input actions defined in input action map "Car".
     /// </summary>
@@ -387,6 +431,14 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Car/Horn".
         /// </summary>
         public InputAction @Horn => m_Wrapper.m_Car_Horn;
+        /// <summary>
+        /// Provides access to the underlying input action "Car/Unstuck".
+        /// </summary>
+        public InputAction @Unstuck => m_Wrapper.m_Car_Unstuck;
+        /// <summary>
+        /// Provides access to the underlying input action "Car/StatsToggle".
+        /// </summary>
+        public InputAction @StatsToggle => m_Wrapper.m_Car_StatsToggle;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -428,6 +480,12 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
             @Horn.started += instance.OnHorn;
             @Horn.performed += instance.OnHorn;
             @Horn.canceled += instance.OnHorn;
+            @Unstuck.started += instance.OnUnstuck;
+            @Unstuck.performed += instance.OnUnstuck;
+            @Unstuck.canceled += instance.OnUnstuck;
+            @StatsToggle.started += instance.OnStatsToggle;
+            @StatsToggle.performed += instance.OnStatsToggle;
+            @StatsToggle.canceled += instance.OnStatsToggle;
         }
 
         /// <summary>
@@ -454,6 +512,12 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
             @Horn.started -= instance.OnHorn;
             @Horn.performed -= instance.OnHorn;
             @Horn.canceled -= instance.OnHorn;
+            @Unstuck.started -= instance.OnUnstuck;
+            @Unstuck.performed -= instance.OnUnstuck;
+            @Unstuck.canceled -= instance.OnUnstuck;
+            @StatsToggle.started -= instance.OnStatsToggle;
+            @StatsToggle.performed -= instance.OnStatsToggle;
+            @StatsToggle.canceled -= instance.OnStatsToggle;
         }
 
         /// <summary>
@@ -529,5 +593,19 @@ public partial class @CarInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnHorn(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Unstuck" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnUnstuck(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "StatsToggle" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnStatsToggle(InputAction.CallbackContext context);
     }
 }

@@ -50,13 +50,9 @@ public class AudioController : MonoBehaviour
   [Tooltip("Maximum crash collision volume.")]
   public float maxCrashCollisionVolume = 0.4f;
 
-  // For Components
-  CarController carController;
-
   // For Variables
   float speedFactor;
   float powerFactor;
-  float moveInput;
   float hornInput;
 
 
@@ -95,7 +91,6 @@ public class AudioController : MonoBehaviour
     }
 
     // Get component attached to the GameObject
-    carController = GetComponent<CarController>();
     motorHum = GetComponent<AudioSource>();
   }
 
@@ -110,39 +105,12 @@ public class AudioController : MonoBehaviour
 
   void SoundInput()
   {
-    // Read the Axis 1D input from the Input System
-    moveInput = carControls.Car.Movement.ReadValue<float>();
-
     // Read the button input from the Input System
     hornInput = carControls.Car.Horn.ReadValue<float>();
   }
 
   void MotorHum()
   {
-    // AUDIO CONTROL PARAMETERS
-    //// Use-case: Driving against a wall with slightly higher pitch to indicate motor struggle
-    //float currentMinMotorPitch = 0;
-    //if (speedFactor < 0.001f && moveInput != 0)
-    //{
-    //  currentMinMotorPitch = minMotorPitch + (maxMotorPitch - minMotorPitch) * 0.1f;
-    //}
-    //// Use-case: Make slightly lower motor noise when coasting in motion without active torque
-    //float currentMinMotorVolume = 0;
-    //if (speedFactor > 0.001f)
-    //{
-    //  currentMinMotorVolume = maxMotorVolume * 0.8f;
-    //}
-
-    //// PITCH
-    //// Modify pitch as the car accelerates
-    //float targetPitch = Mathf.Lerp(currentMinMotorPitch, maxMotorPitch, powerFactor);
-    //motorHum.pitch = Mathf.Lerp(motorHum.pitch, targetPitch, motorPitchDamping);
-
-    //// VOLUME
-    //// Modify volume as the car powers
-    //float targetVolume = Mathf.Lerp(currentMinMotorVolume, maxMotorVolume, torqueFactor);
-    //motorHum.volume = Mathf.Lerp(motorHum.volume, targetVolume, motorVolumeDamping);
-
     // PITCH
     // Modify pitch as the car accelerates
     float targetPitch = Mathf.Lerp(minMotorPitch, maxMotorPitch, speedFactor);

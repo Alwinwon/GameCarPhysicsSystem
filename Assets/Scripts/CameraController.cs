@@ -89,7 +89,8 @@ public class CameraController : MonoBehaviour
     cam = GetComponentInChildren<Camera>().transform;
 
     // Initialize the position and rotation of the camera
-    cam.localPosition = offset;
+    transform.position = car.position + new Vector3(offset.x, offset.y, 0); // Camera origin position
+    cam.localPosition = new Vector3(0, 0, offset.z); // Local camera position
     transform.rotation = Quaternion.Euler(pitch, yaw, 0);
   }
 
@@ -130,9 +131,6 @@ public class CameraController : MonoBehaviour
 
   void Look()
   {
-    // Camera using the car position
-    transform.position = car.position;
-
     // Auto rotate (yaw) back if car is moving and no hInput
     if (actualSpeedFactor > 0.001f && hInput == 0f)
     {
@@ -157,16 +155,19 @@ public class CameraController : MonoBehaviour
     // Smoothly orbit around the car
     transform.rotation = Quaternion.Lerp(transform.rotation, targetRotation, orbitDamping);
 
+    // Camera origin position using the car position with offset
+    transform.position = car.position + new Vector3(offset.x, offset.y, 0);
+
     // Dynamic offset from the car
     float dynamicDistance = Mathf.Lerp(offset.z, offset.z - maxDynamicDistance, actualSpeedFactor);
-    Vector3 camPos = new Vector3(offset.x, offset.y, dynamicDistance); // Local camera position
-
+    Vector3 camPos = new Vector3(0, 0, dynamicDistance); // Local camera position
+    
     // Using raycast to detect and avoid camera collision (ignoring Car LayerMask)
     RaycastHit hit;
-    Vector3 carToCam = transform.TransformPoint(camPos) - car.position;
-    if (Physics.Raycast(car.position, carToCam.normalized, out hit, carToCam.magnitude, ~carLayerMask))
+    Vector3 carToCam = transform.TransformPoint(camPos) - transform.position;
+    if (Physics.Raycast(transform.position, carToCam.normalized, out hit, carToCam.magnitude, ~carLayerMask))
     {
-      cam.position = Vector3.Lerp(cam.position, hit.point * 0.9f, collisionAvoidanceDamping);
+      cam.position = Vector3.Lerp(cam.position, hit.point * 0.9f, collisionAvoidanceDamping); // 0.9f for 0.1f clearance
 
       // DEBUGGING
       Debug.Log($"Raycast hit: {hit.collider.name}");

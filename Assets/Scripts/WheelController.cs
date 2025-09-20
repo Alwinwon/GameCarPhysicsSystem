@@ -27,7 +27,7 @@ public class WheelController : MonoBehaviour
   CarController carController;
 
   // For Variables
-  float forwardSpeed;
+  float actualSpeed;
 
   // Initialize is called once by CarController to ensure the variable is initialized before calling it
   public void Initialize()
@@ -91,7 +91,7 @@ public class WheelController : MonoBehaviour
       // Modify the number of particle over a distance (More Slipping = Heavier Smoke)
       emission.rateOverDistance = 3 * slip;
       // Use-case: Driving against a wall creates lot of skid smoke
-      if (forwardSpeed < 0.1f) emission.rateOverTime = 6 * slip;
+      if (actualSpeed < 0.1f) emission.rateOverTime = 6 * slip;
       else emission.rateOverTime = 0f;
       // Trigger skid smoke
       if (!skidSmoke.isPlaying) skidSmoke.Play();
@@ -120,6 +120,6 @@ public class WheelController : MonoBehaviour
   // Called by CarController to update data
   public void DataUpdate(float speed)
   {
-    forwardSpeed = speed;
+    actualSpeed = speed;
   }
 }
