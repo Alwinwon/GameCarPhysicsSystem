@@ -52,12 +52,6 @@ public class CollisionController : MonoBehaviour
     carController = GetComponent<CarController>();
   }
 
-  // Update is called once per frame
-  void Update()
-  {
-    
-  }
-
   // Crash too sensitive! Adjust to lower sensitivity!
   // OnCollisionEnter is called on the first frame of collision
   void OnCollisionEnter(Collision collision)

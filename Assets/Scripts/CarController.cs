@@ -108,11 +108,12 @@ public class CarController : MonoBehaviour
   [Header("For Debugging")]
   [Tooltip("Scale for the debugging rays on forces acting on the car.")]
   [Range(0f, 1f)]
-  [SerializeField] float scale = 0.01f;
+  [SerializeField] float lineScale = 0.01f;
 
   [Header("Link Camera")]
   [Tooltip("Assign CameraController to link the camera to the CarController.")]
   public CameraController camController;
+  public CarGUI carGUI;
 
   // For Components
   Rigidbody rb;
@@ -126,11 +127,11 @@ public class CarController : MonoBehaviour
   float moveInput = 0f;
   float brakeInput = 0f;
   float maxSpeed = 0f;
+  float forwardSpeed = 0f;
   float speedFactor = 0f;
   float actualSpeedFactor = 0f;
   float powerFactor = 0f;
   float torqueFactor = 0f;
-  float forwardSpeed = 0f;
   float rbSpeed = 0f;
   float[] previousSuspensionDisplacement = new float[4];
   float[] rollingResistanceMagnitude = new float[4];
@@ -157,7 +158,7 @@ public class CarController : MonoBehaviour
   void Start()
   {
     // Ensure variables are assigned
-    if (camController == null)
+    if (!camController || !carGUI)
     {
       Debug.LogError("Cam Controller is not assigned to CarController!");
       return;
@@ -349,7 +350,7 @@ public class CarController : MonoBehaviour
 
     // DEBUGGING
     Debug.Log($"Total Drag (N): {dragMagnitude}");
-    Debug.DrawRay(transform.position + new Vector3(0, 1.5f, 0), dragForce * scale, Color.red);
+    Debug.DrawRay(transform.position + new Vector3(0, 1.5f, 0), dragForce * lineScale, Color.red);
   }
 
   void LiftDownforce()
@@ -368,15 +369,15 @@ public class CarController : MonoBehaviour
 
     // DEBUGGING
     Debug.Log($"Total Lift/Downforce - Front (N): {frontLiftForce.y}, Rear (N): {rearLiftForce.y}");
-    Debug.DrawRay(frontAxle, frontLiftForce * scale, Color.green);
-    Debug.DrawRay(rearAxle, rearLiftForce * scale, Color.green);
+    Debug.DrawRay(frontAxle, frontLiftForce * lineScale, Color.green);
+    Debug.DrawRay(rearAxle, rearLiftForce * lineScale, Color.green);
   }
 
   void RollingResistance()
   {
     for (int i = 0; i < wheels.Length; i++)
     {
-      // Get current suspension compression/extension
+      // If wheel is grounded and moving, get current suspension compression/extension
       if (wheels[i].wheelCollider.GetGroundHit(out WheelHit hit) && wheels[i].wheelCollider.rpm != 0f)
       {
         // Calculate current suspension distance
@@ -404,12 +405,12 @@ public class CarController : MonoBehaviour
 
         // Apply rolling resistance equation (Frr = Crr * Fn) depending on wheel's rotation direction
         // (!) Rolling resistance to be applied in MotorsBrakes() to the wheel collider as brake torque to resist its motion
-        rollingResistanceMagnitude[i] = rollingResistanceCoefficient * Fn; //-Mathf.Sign(wheels[i].wheelCollider.rpm) * 
+        rollingResistanceMagnitude[i] = rollingResistanceCoefficient * Fn;
 
         // DEBUGGING
         Debug.Log($"Spring Force (N): {springForce}, Damping Force: {dampingForce} ,Rolling Resistance Force (N): {rollingResistanceMagnitude[i]}");
         Debug.DrawRay(hit.point + new Vector3(0, wheelRadius / 2, 0),
-                      wheels[i].transform.forward * rollingResistanceMagnitude[i],
+                      Mathf.Sign(wheels[i].wheelCollider.rpm) * wheels[i].transform.forward * rollingResistanceMagnitude[i] * lineScale,
                       Color.blue);
       }
       else
@@ -576,12 +577,14 @@ public class CarController : MonoBehaviour
   // Keep it's data private
   void DataUpdateComponents()
   {
-    camController.DataUpdate(actualSpeedFactor);
+    camController.DataUpdate(forwardSpeed, actualSpeedFactor);
     collisionController.DataUpdate(maxSpeed);
     audioController.DataUpdate(speedFactor, powerFactor);
     foreach (var wheel in wheels)
     {
       wheel.DataUpdate(forwardSpeed);
     }
+
+    carGUI.DataUpdate();
   }
 }

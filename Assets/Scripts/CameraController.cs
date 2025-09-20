@@ -43,6 +43,7 @@ public class CameraController : MonoBehaviour
   // For Variables
   float hInput;
   float vInput;
+  float actualSpeed;
   float actualSpeedFactor;
 
   // Reference to the input system
@@ -136,7 +137,15 @@ public class CameraController : MonoBehaviour
     if (actualSpeedFactor > 0.001f && hInput == 0f)
     {
       // Calculation of signed delta angle [0, 360]
-      float yawDeltaAngle = Mathf.DeltaAngle(yaw, car.rotation.eulerAngles.y);
+      float yawDeltaAngle = 0f;
+      if (actualSpeed >= 0f) // If accelerating forward
+      {
+        yawDeltaAngle = Mathf.DeltaAngle(yaw, car.rotation.eulerAngles.y);
+      }
+      else // If reversing backwards
+      {
+        yawDeltaAngle = Mathf.DeltaAngle(yaw, car.rotation.eulerAngles.y - 180);
+      }
 
       // Calculation of auto yaw rotation [0, 360]
       yaw += yawDeltaAngle * actualSpeedFactor * autoRotateSensitivity;
@@ -208,8 +217,9 @@ public class CameraController : MonoBehaviour
   }
 
   // Called by CarController to update data
-  public void DataUpdate(float speed)
+  public void DataUpdate(float speed, float speedFactor)
   {
-    actualSpeedFactor = speed;
+    actualSpeed = speed; // Signed
+    actualSpeedFactor = speedFactor; // Unsigned
   }
 }
