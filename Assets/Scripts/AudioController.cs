@@ -10,7 +10,7 @@ public class AudioController : MonoBehaviour
   [Tooltip("Assign the horn audio source here.")]
   public AudioSource horn;
   [Tooltip("Assign the crach collision audio source here for all wheels.")]
-  public AudioSource crashCollision;
+  public AudioSource impactCollision;
 
   [Header("Audio Sources - Wheel(s)")]
   [Tooltip("Assign the roadNoise(s) audio sources here for all wheels " +
@@ -57,7 +57,8 @@ public class AudioController : MonoBehaviour
 
   // For Variables
   float speedFactor;
-  float motorTorque;
+  float powerFactor;
+  float torqueFactor;
   float moveInput;
   float hornInput;
 
@@ -82,12 +83,12 @@ public class AudioController : MonoBehaviour
   // Start is called once before the first execution of Update after the MonoBehaviour is created
   void Start()
   {
-    // Ensure variables are assigned
-    //if (!motorHum || !roadNoise || !horn)
-    //{
-    //  Debug.LogError("AudioSources not assigned to AudioController!");
-    //  return;
-    //}
+    //Ensure variables are assigned
+    if (!motorHum || !horn || !impactCollision || roadNoise == null || tireScreech == null)
+    {
+      Debug.LogError("AudioSource(s) not assigned to AudioController!");
+      return;
+    }
 
     // Check inputs
     if (minMotorPitch > maxMotorPitch)
@@ -122,27 +123,37 @@ public class AudioController : MonoBehaviour
   void MotorHum()
   {
     // AUDIO CONTROL PARAMETERS
-    // Use-case: Driving against a wall with slightly higher pitch to indicate motor struggle
-    float currentMinMotorPitch = 0;
-    if (speedFactor < 0.001f && moveInput != 0)
-    {
-      currentMinMotorPitch = minMotorPitch + (maxMotorPitch - minMotorPitch) * 0.1f;
-    }
-    // Use-case: Make slightly lower motor noise when coasting in motion without active torque
-    float currentMinMotorVolume = 0;
-    if (speedFactor > 0.001f)
-    {
-      currentMinMotorVolume = maxMotorVolume * 0.8f;
-    }
+    //// Use-case: Driving against a wall with slightly higher pitch to indicate motor struggle
+    //float currentMinMotorPitch = 0;
+    //if (speedFactor < 0.001f && moveInput != 0)
+    //{
+    //  currentMinMotorPitch = minMotorPitch + (maxMotorPitch - minMotorPitch) * 0.1f;
+    //}
+    //// Use-case: Make slightly lower motor noise when coasting in motion without active torque
+    //float currentMinMotorVolume = 0;
+    //if (speedFactor > 0.001f)
+    //{
+    //  currentMinMotorVolume = maxMotorVolume * 0.8f;
+    //}
+
+    //// PITCH
+    //// Modify pitch as the car accelerates
+    //float targetPitch = Mathf.Lerp(currentMinMotorPitch, maxMotorPitch, powerFactor);
+    //motorHum.pitch = Mathf.Lerp(motorHum.pitch, targetPitch, motorPitchDamping);
+
+    //// VOLUME
+    //// Modify volume as the car powers
+    //float targetVolume = Mathf.Lerp(currentMinMotorVolume, maxMotorVolume, torqueFactor);
+    //motorHum.volume = Mathf.Lerp(motorHum.volume, targetVolume, motorVolumeDamping);
 
     // PITCH
     // Modify pitch as the car accelerates
-    float targetPitch = Mathf.Lerp(currentMinMotorPitch, maxMotorPitch, speedFactor);
+    float targetPitch = Mathf.Lerp(minMotorPitch, maxMotorPitch, powerFactor);
     motorHum.pitch = Mathf.Lerp(motorHum.pitch, targetPitch, motorPitchDamping);
 
     // VOLUME
     // Modify volume as the car powers
-    float targetVolume = Mathf.Lerp(currentMinMotorVolume, maxMotorVolume, motorTorque);
+    float targetVolume = maxMotorVolume * torqueFactor;
     motorHum.volume = Mathf.Lerp(motorHum.volume, targetVolume, motorVolumeDamping);
 
     // DEBUGGING
@@ -194,14 +205,15 @@ public class AudioController : MonoBehaviour
   // Called by CollisionController on crash collision
   public void ImpactCollision(float intensityFactor)
   {
-    crashCollision.volume = maxCrashCollisionVolume * intensityFactor;
-    crashCollision.Play();
+    impactCollision.volume = maxCrashCollisionVolume * intensityFactor;
+    impactCollision.Play();
   }
 
   // Called by CarController to update data
-  public void DataUpdate(float speed, float torque)
+  public void DataUpdate(float speed, float power, float torque)
   {
     speedFactor = speed;
-    motorTorque = torque;
+    powerFactor = power;
+    torqueFactor = torque;
   }
 }
