@@ -1,5 +1,5 @@
 using UnityEngine;
-using System.Collections;
+using System.Collections; // // Import the System Collection namespace for IEnumerator
 
 public class CameraController : MonoBehaviour
 {
@@ -13,9 +13,9 @@ public class CameraController : MonoBehaviour
   [Tooltip("Camera dynamic distance when accelerating and decelerating.")]
   public float maxDynamicDistance = 2f;
   [Tooltip("Camera turning damping (Lower value, higher damping).")]
-  public float orbitDamping = 0.1f;
+  public float orbitDamping = 0.05f;
   [Tooltip("Camera auto rotate yaw sensitivity as the car is moving (Higher value, more sensitive).")]
-  public float autoRotateSensitivity = 0.1f;
+  public float autoRotateSensitivity = 0.05f;
   [Tooltip("Camera collision avoidance damping (Lower value, higher damping).")]
   public float collisionAvoidanceDamping = 0.5f;
   [Tooltip("Assign the car's LayerMask for collision avoidance to ignore.")]
@@ -23,7 +23,7 @@ public class CameraController : MonoBehaviour
 
   [Header("Mouse Orbit Settings")]
   [Tooltip("Mouse look sensitivity (Higher value, more sensitive).")]
-  public float mouseSensitivity = 0.15f;
+  public float mouseSensitivity = 0.05f;
   [Tooltip("Mouse Y rotation (left & right).")]
   public float yaw = 0f;
   [Tooltip("Invert yaw axis.")]

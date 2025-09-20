@@ -13,6 +13,8 @@ public class WheelController : MonoBehaviour
   [Header("Wheel Properties")] // Properties for the CarController script
   [Tooltip("Wheel ID correspond to AudioController.")]
   public int wheelID;
+  [Tooltip("Wheel name correspond to CarGUI.")]
+  public string wheelName;
   [Tooltip("Select if the wheel was motorized.")]
   public bool motorized;
   [Tooltip("Select if wheel can be used to steer.")]
@@ -27,6 +29,7 @@ public class WheelController : MonoBehaviour
   CarController carController;
 
   // For Variables
+  public float slip;
   float actualSpeed;
 
   // Initialize is called once by CarController to ensure the variable is initialized before calling it
@@ -78,7 +81,7 @@ public class WheelController : MonoBehaviour
   {
     // Calculate current slip from wheel collider's ground hit
     wheelCollider.GetGroundHit(out WheelHit hit);
-    float slip = Mathf.Abs(hit.forwardSlip) + Mathf.Abs(hit.sidewaysSlip);
+    slip = Mathf.Abs(hit.forwardSlip) + Mathf.Abs(hit.sidewaysSlip);
 
     // DEBUGGING
     //Debug.Log($"Slip: {slip}");

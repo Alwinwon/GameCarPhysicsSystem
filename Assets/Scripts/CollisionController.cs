@@ -60,33 +60,30 @@ public class CollisionController : MonoBehaviour
     // Normalize intensity factor (m/s to km/h by multiplying 3600/1000)
     float intensityFactor = Mathf.InverseLerp(0, maxSpeed, Mathf.Abs(collisionSpeed) * 3.6f);
 
-    //if (collision.gameObject.CompareTag("Obstacle"))
-    //{
-      // Spawn the sparks
-      ParticleSystem sparks = Instantiate(sparksPrefab,
-                                          collision.contacts[0].point,
-                                          Quaternion.LookRotation(collision.contacts[0].normal));
+    // Spawn the sparks
+    ParticleSystem sparks = Instantiate(sparksPrefab,
+                                        collision.contacts[0].point,
+                                        Quaternion.LookRotation(collision.contacts[0].normal));
 
-      // Get the current particle system's emission settings
-      var emission = sparks.emission;
-      // Modify the burst particles in relation to Impact force
-      emission.SetBurst(0, new ParticleSystem.Burst(0f, Mathf.Lerp(minSparkBurst, maxSparkBurst, intensityFactor)));
-      // Trigger sparks at contact point
-      sparks.Play();
-      // Clean up after duration
-      Destroy(sparks.gameObject, sparks.main.duration);
+    // Get the current particle system's emission settings
+    var emission = sparks.emission;
+    // Modify the burst particles in relation to Impact force
+    emission.SetBurst(0, new ParticleSystem.Burst(0f, Mathf.Lerp(minSparkBurst, maxSparkBurst, intensityFactor)));
+    // Trigger sparks at contact point
+    sparks.Play();
+    // Clean up after duration
+    Destroy(sparks.gameObject, sparks.main.duration);
 
-      // Trigger camera shake from CameraController
-      // (?) Everything connects to CarController for Organization
-      carController.camController.CollisionShake(intensityFactor,
-                                                 minShakeIntensity,
-                                                 maxShakeIntensity,
-                                                 shakeDuration,
-                                                 shakeDecay);
-      // Trigger Impact collision audio from AudioController
-      // (?) Everything connects to CarController for Organization
-      carController.audioController.ImpactCollision(intensityFactor);
-    //}
+    // Trigger camera shake from CameraController
+    // (?) Everything connects to CarController for Organization
+    carController.camController.CollisionShake(intensityFactor,
+                                                minShakeIntensity,
+                                                maxShakeIntensity,
+                                                shakeDuration,
+                                                shakeDecay);
+    // Trigger Impact collision audio from AudioController
+    // (?) Everything connects to CarController for Organization
+    carController.audioController.ImpactCollision(intensityFactor);
   }
 
   // Called by CarController to update data
