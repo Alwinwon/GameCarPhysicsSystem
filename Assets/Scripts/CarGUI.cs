@@ -55,21 +55,23 @@ public class CarGUI : MonoBehaviour
 
   // Display stats of each wheel
   public void WheelStats(WheelController[] wheels,
-                         float[] suspensionDisplacement,
-                         float[] rollingResistanceMagnitude)
+                         float[] rollingResistanceMagnitude,
+                         float[] normalForce,
+                         float[] suspensionDisplacement)
   {
     if (wheelStats.Length == wheels.Length)
     {
       for (int i = 0; i < wheels.Length; i++)
       {
         wheelStats[i].text = $"<size={headerSize}><color=white>{wheels[i].wheelName} Wheel</color></size>\n\n" +
-                             $"<size={textSize}><color=white><b>Wheel & Suspension</b></color></size>\n" +
+                             $"<size={textSize}><color=white><b>Wheel</b></color></size>\n" +
                              $"<size={textSize}><color=yellow>RPM: {wheels[i].wheelCollider.rpm:F1}</color></size>\n" +
                              $"<size={textSize}><color=green>Torque: {wheels[i].wheelCollider.motorTorque:F1} Nm</color></size>\n" +
                              $"<size={textSize}><color=orange>Total Slip: {wheels[i].slip:F2}</color></size>\n" +
-                             $"<size={textSize}><color=yellow>Suspension Displacement: {suspensionDisplacement[i]*1000f:F0} mm</color></size>\n" +
-                             $"<size={textSize}><color=white><b>Aerodynamics</b></color></size>\n" +
-                             $"<size={textSize}><color=red>Rolling Resistance: {rollingResistanceMagnitude[i]:F2} N</color></size>";
+                             $"<size={textSize}><color=red>Rolling Resistance: {rollingResistanceMagnitude[i]:F2} N</color></size>\n" +
+                             $"<size={textSize}><color=white><b>Suspension</b></color></size>\n" +
+                             $"<size={textSize}><color=yellow>Normal Force: {normalForce[i]:F2} N</color></size>\n" +
+                             $"<size={textSize}><color=yellow>Suspension Displacement: {suspensionDisplacement[i] * 1000f:F0} mm</color></size>";
       }
     }
     else

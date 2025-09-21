@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem; // Import the Input System namespace for CallbackContext
 
@@ -11,9 +12,15 @@ public class CarController : MonoBehaviour
   [Tooltip("Laden mass of the car (kg), excluding wheels.")]
   [Range(1000f, 10000f)]
   [SerializeField] float ladenMass = 1851f + 80f; // Includes 80kg driver
-  [Range(-0.5f, 0.5f)]
   [Tooltip("Mass offset of the center of gravity of the car.")]
+  [Range(-0.5f, 0.5f)]
   [SerializeField] float centreOfGravityOffset = -0.5f;
+  [Tooltip("Front axle weight factor. Ensure both front & rear axle weight factor does not exceed 1.")]
+  [Range(0f, 1f)]
+  [SerializeField] float frontAxleWeightFactor = 932f / 1851f;
+  [Tooltip("Rear axle weight factor. Ensure both front & rear axle weight factor does not exceed 1.")]
+  [Range(0f, 1f)]
+  [SerializeField] float rearAxleWeightFactor = 919f / 1851f;
 
   [Header("Motors & Brakes")]
   [Tooltip("Select type of drivetrain.")]
@@ -76,6 +83,10 @@ public class CarController : MonoBehaviour
   [Tooltip("Damping coefficient, c (Ns/m)")]
   [Range(1000f, 10000f)]
   [SerializeField] float dampening = 2500f;
+  [Tooltip("Front axle lateral distance from car's midpoint (m)")]
+  [SerializeField] float frontAxleDistance = 1.739395f;
+  [Tooltip("Rear axle lateral distance from car's midpoint (m)")]
+  [SerializeField] float rearAxleDistance = 1.572661f;
 
   [Header("Aerodynamics")]
   [Tooltip("Air density (p), default according to ISA (kg/m3).")]
@@ -102,6 +113,12 @@ public class CarController : MonoBehaviour
   [SerializeField] float rearLiftDownforceCoefficieint = -0.2f; // Negative for downforce (lip spoiler)
   [Tooltip("Estimated total rolling resistance coefficient (Crr) of each wheel.")]
   [SerializeField] float rollingResistanceCoefficient = 0.015f;
+
+  [Header("Model Setup")]
+  [Tooltip("Default model ground clearance to car's axle (m).")]
+  [SerializeField] float defaultGroundClearance = 0.4075898f;
+  [Tooltip("Default model wheel radius at scale = 1 (m).")]
+  [SerializeField] float defaultWheelRadius = 0.4075898f;
 
   [Header("Respawn")]
   [Tooltip("Specify the respawn coordinate whenever the car falls off the world or get stuck.")]
@@ -131,8 +148,6 @@ public class CarController : MonoBehaviour
   [HideInInspector] public WheelController[] wheels;
 
   // For Variables
-  // Fixed local space ground clearance to wheel axle / default wheel radius at scale = 1
-  float clear = 0.4075898f;
   // Inputs
   float hInput = 0f;
   float vInput = 0f;
@@ -151,6 +166,9 @@ public class CarController : MonoBehaviour
   float currentRearMotorRPM = 0f;
   float currentFrontMotorTorque = 0f;
   float currentRearMotorTorque = 0f;
+  // Tires
+  float[] normalForce = new float[4];
+  float[] rollingResistanceMagnitude = new float[4];
   // Aerodynamics
   float rbSpeed = 0f;
   float dragMagnitude = 0f;
@@ -158,7 +176,6 @@ public class CarController : MonoBehaviour
   float rearLiftMagnitude = 0f;
   float[] suspensionDisplacement = new float[4];
   float[] previousSuspensionDisplacement = new float[4];
-  float[] rollingResistanceMagnitude = new float[4];
 
   // Reference to the new input system
   CarInputActions carControls;
@@ -192,6 +209,13 @@ public class CarController : MonoBehaviour
       return;
     }
 
+    // Check inputs (0.1f tolerance)
+    if (frontAxleWeightFactor + rearAxleWeightFactor > 1.1f)
+    {
+      Debug.LogError("Front and Rear Axle Weight Factor exceeded 1!");
+      return;
+    }
+
     // Get all components attached to the car and its children
     rb = GetComponent<Rigidbody>();
     collisionController = GetComponent<CollisionController>();
@@ -220,14 +244,18 @@ public class CarController : MonoBehaviour
     Cursor.lockState = CursorLockMode.Locked;
   }
 
+  // ====================================================================================================
+  // SETUP
+
   // Setup is called once by start and when resetting-up
   // (?) To optimize performance as it doesn't require constant update
   void Setup()
   {
     ChassisSetup();
+    DrivetrainSetup();
     WheelSetup();
     SuspensionSetup();
-    DrivetrainSetup();
+    AerodynamicsSetup();
   }
 
   void ChassisSetup()
@@ -239,62 +267,6 @@ public class CarController : MonoBehaviour
     Vector3 centerOfMass = rb.centerOfMass;
     centerOfMass.y += centreOfGravityOffset;
     rb.centerOfMass = centerOfMass;
-  }
-
-  void WheelSetup()
-  {
-    foreach (var wheel in wheels)
-    {
-      // Assign wheelCollider carProperties for each wheel
-      // (!) Ensure the set Edit > Project Settings > Time > Fixed Timstep from 0.02 (default) to 0.004.
-      // (?) The default fixed timestep is too coarse for low-speed precision, leading to erractice motion
-      wheel.wheelCollider.mass = wheelMass;
-      wheel.wheelCollider.radius = wheelRadius;
-      
-      // Scale the wheel model using (Desired Radius / Reference Radius)
-      // (?) Model Radius at Scale = 1 is 0.4075898f
-      float wheelModelScale = wheelRadius / clear;
-      wheel.wheel.localScale = new Vector3(1f, wheelModelScale, wheelModelScale);
-
-      wheel.wheelCollider.ConfigureVehicleSubsteps(100, 1, 1);
-    }
-  }
-
-  void SuspensionSetup()
-  {
-    foreach (var wheel in wheels)
-    {
-      // Assign suspension distance
-      wheel.wheelCollider.suspensionDistance = suspensionDistance;
-      // Adjust ride height to half of the suspension distance in both direction (up/down)
-      // (?) Ride height stays constant by increasing the suspension's y-axis position (by half) into the wheel well
-      //     until it reaches the wheel well's allowable suspension displacement. From there, its position will remain
-      //     at the same maximum allowable position where the wheel will extend lower downwards increasing the ride height.
-      // (!) Consider local space fixed ground clearance to wheel axle for the wheel's position prior to runtime,
-      //     irrelevant to the wheel's radius.
-      wheel.transform.localPosition = new Vector3(wheel.transform.localPosition.x,
-                                                  clear +
-                                                  Mathf.Min(suspensionDistance, allowSuspensionDisplacement) / 2,
-                                                  wheel.transform.localPosition.z);
-
-      // Get the current suspension spring settings
-      JointSpring spring = wheel.wheelCollider.suspensionSpring;
-      // Modify the spring & damper values
-      spring.spring = stiffness;
-      spring.damper = dampening;
-      // Apply the modified settings back to the wheel collider
-      wheel.wheelCollider.suspensionSpring = spring;
-
-      // Get the current friction settings
-      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
-      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
-      // Modify the stiffness values
-      frontFriction.stiffness = tireFriction;
-      sideFriction.stiffness = tireFriction;
-      // Apply the modified settings back to the wheel collider
-      wheel.wheelCollider.forwardFriction = frontFriction;
-      wheel.wheelCollider.sidewaysFriction = sideFriction;
-    }
   }
 
   void DrivetrainSetup()
@@ -326,27 +298,92 @@ public class CarController : MonoBehaviour
     }
   }
 
+  void WheelSetup()
+  {
+    foreach (var wheel in wheels)
+    {
+      // Assign wheelCollider carProperties for each wheel
+      // (!) Ensure the set Edit > Project Settings > Time > Fixed Time step from 0.02 (default) to 0.004.
+      // (?) The default fixed timestep is too coarse for low-speed precision, leading to erractice motion
+      wheel.wheelCollider.mass = wheelMass;
+      wheel.wheelCollider.radius = wheelRadius;
+      
+      // Scale the wheel model using (Desired Radius / Reference Radius)
+      // (?) Model Radius at Scale = 1 is 0.4075898f
+      float wheelModelScale = wheelRadius / defaultWheelRadius;
+      wheel.wheel.localScale = new Vector3(1f, wheelModelScale, wheelModelScale);
+    }
+  }
+
+  void SuspensionSetup()
+  {
+    foreach (var wheel in wheels)
+    {
+      // Assign suspension distance
+      wheel.wheelCollider.suspensionDistance = suspensionDistance;
+      // Adjust ride height to half of the suspension distance in both direction (up/down)
+      // (?) Ride height stays constant by increasing the suspension's y-axis position (by half) into the wheel well
+      //     until it reaches the wheel well's allowable suspension displacement. From there, its position will remain
+      //     at the same maximum allowable position where the wheel will extend lower downwards increasing the ride height.
+      // (!) Consider local space fixed ground clearance to wheel axle for the wheel's position prior to runtime,
+      //     irrelevant to the wheel's radius.
+      wheel.transform.localPosition = new Vector3(wheel.transform.localPosition.x,
+                                                  defaultGroundClearance +
+                                                  Mathf.Min(suspensionDistance, allowSuspensionDisplacement) / 2,
+                                                  wheel.transform.localPosition.z);
+
+      // Get the current suspension spring settings
+      JointSpring spring = wheel.wheelCollider.suspensionSpring;
+      // Modify the spring & damper values
+      spring.spring = stiffness;
+      spring.damper = dampening;
+      // Apply the modified settings back to the wheel collider
+      wheel.wheelCollider.suspensionSpring = spring;
+
+      // Get the current friction settings
+      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
+      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
+      // Modify the stiffness values
+      frontFriction.stiffness = tireFriction;
+      sideFriction.stiffness = tireFriction;
+      // Apply the modified settings back to the wheel collider
+      wheel.wheelCollider.forwardFriction = frontFriction;
+      wheel.wheelCollider.sidewaysFriction = sideFriction;
+    }
+  }
+
+  void AerodynamicsSetup()
+  {
+    // Disable rigidbody's drag
+    rb.linearDamping = 0f;
+    rb.angularDamping = 0f;
+  }
+
+  // ====================================================================================================
+
   // FixedUpdate is called once per fixed time frame
   void FixedUpdate()
   {
     DrivingInput();
-    Steering();
     MotorsBrakes();
+    Steering();
     GroundFriction();
+    RollingResistance();
     Aerodynamics();
     DataUpdateComponents();
     if (transform.position.y < -1) Unstuck();
     if (autoUpdate) Setup();
   }
+
   void DrivingInput()
   {
     // Read the Vector2 input from the Input System
     Vector2 turnInput = carControls.Car.Steering.ReadValue<Vector2>();
 
     // Get player input for acceleration and steering
-    vInput = turnInput.y; // Forward/backward input
     hInput = turnInput.x; // Steering input
-
+    vInput = turnInput.y; // Forward/backward input
+    
     // Read the value input from the Input System
     moveInput = carControls.Car.Movement.ReadValue<float>();
     brakeInput = carControls.Car.Brake.ReadValue<float>();
@@ -355,31 +392,6 @@ public class CarController : MonoBehaviour
     Debug.Log($"Turning = X: {vInput}, Y: {hInput}; Move: {moveInput}, Brake: {brakeInput}");
   }
 
-  void Steering()
-  {
-    // Calculate the steer angle range in relation to speed factor
-    float currentSteerRange = Mathf.Lerp(TurnAngle, TurnAngleAtMaxSpeed, speedFactor);
-
-    foreach (var wheel in wheels)
-    {
-      // Apply steering to wheels that support steering
-      if (wheel.steerable)
-      {
-        // Controls to steer to the current steer range
-        float currentSteerAngle = hInput * currentSteerRange;
-
-        // Transition smoothly between original to calculated turn angle
-        float transitionSteerAngle = Mathf.Lerp(wheel.wheelCollider.steerAngle,
-                                                currentSteerAngle,
-                                                0.1f);
-
-        // Update wheel angle
-        wheel.wheelCollider.steerAngle = transitionSteerAngle;
-      }
-    }
-  }
-
-  // Fix Acc/Reverse Sensitivity to Prevent Stalling
   void MotorsBrakes()
   {
     // Calculate actual current speed along the car's rigidbody forward axis (direction of travel)
@@ -540,6 +552,30 @@ public class CarController : MonoBehaviour
     //Debug.Log($"Speed Factor: {speedFactor}, Power Factor: {powerFactor}, Torque Factor: {torqueFactor}");
   }
 
+  void Steering()
+  {
+    // Calculate the steer angle range in relation to speed factor
+    float currentSteerRange = Mathf.Lerp(TurnAngle, TurnAngleAtMaxSpeed, speedFactor);
+
+    foreach (var wheel in wheels)
+    {
+      // Apply steering to wheels that support steering
+      if (wheel.steerable)
+      {
+        // Controls to steer to the current steer range
+        float currentSteerAngle = hInput * currentSteerRange;
+
+        // Transition smoothly between original to calculated turn angle
+        float transitionSteerAngle = Mathf.Lerp(wheel.wheelCollider.steerAngle,
+                                                currentSteerAngle,
+                                                0.1f);
+
+        // Update wheel angle
+        wheel.wheelCollider.steerAngle = transitionSteerAngle;
+      }
+    }
+  }
+
   void GroundFriction()
   {
     foreach (var wheel in wheels)
@@ -562,20 +598,101 @@ public class CarController : MonoBehaviour
     }
   }
 
+  void RollingResistance()
+  {
+    float chassisWeightFactorPerWheel = 0f;
+    float wheelWeight = wheelMass * Physics.gravity.magnitude;
+
+    for (int i = 0; i < wheels.Length; i++)
+    {
+      // Calculate the chassis weight factor based on the front & rear axle distances
+      if (wheels[i].gameObject.tag == "FrontWheel")
+      {
+        chassisWeightFactorPerWheel = frontAxleWeightFactor / 2;
+      }
+      else if (wheels[i].gameObject.tag == "RearWheel")
+      {
+        chassisWeightFactorPerWheel = rearAxleWeightFactor / 2;
+      }
+      else
+      {
+        Debug.LogError("CarControls: Error in determining Front & Rear Wheel in RollingResistance().");
+        return;
+      }
+
+      // Calculate average force on each wheel at rest
+      float chassisWeight = ladenMass * Physics.gravity.magnitude * chassisWeightFactorPerWheel;
+      float weightAtRest = chassisWeight + wheelWeight;
+
+      // If wheel is grounded and moving, get current suspension compression/extension
+      if (wheels[i].wheelCollider.GetGroundHit(out WheelHit hit))
+      {
+        // Calculate current suspension distance
+        float distanceToGround = wheels[i].wheelCollider.transform.position.y - hit.point.y;
+        // Calculate suspension displacement length from the midpoint (how much the spring is pushed in)
+        // (!) Considers world space default wheel collider distance from the ground, to be wheel's radius
+        //     and half of the suspension length in runtime
+        suspensionDisplacement[i] = (wheelRadius + suspensionDistance / 2) - distanceToGround;
+
+        // Using Hooke's Law (F = -k * x) to calculate the force applied by the spring stiffness & dampening
+        // (?) The suspension displacement will reflect on the car's laden weight and any lift/downforce
+        float springForce = stiffness * suspensionDisplacement[i];
+        // Calculate suspension velocity (how fast the suspension is rebounding)
+        float susVelocity = (distanceToGround - previousSuspensionDisplacement[i]) / Time.fixedDeltaTime;
+        // Calculate damping force (F = -c * v), opposing force
+        float dampingForce = dampening * susVelocity;
+        // Calculate total suspension force by combining spring & damping forces
+        float suspensionForce = springForce + dampingForce;
+
+        // Calculate total normal forces with the wheel included
+        // (?) Clamp to 0 since spring's force tries to move upwards (compressing) if it's extended downwards beyond midpoint,
+        //     thus no rolling resistance since no force pushing against the ground, especially when the car is not grounded
+        normalForce[i] = Mathf.Max(0, weightAtRest + suspensionForce);
+
+        // For damping force calculation
+        previousSuspensionDisplacement[i] = distanceToGround;
+
+        // Apply rolling resistance equation (Frr = Crr * Fn) depending on wheel's rotation direction
+        // (!) Apply only if the wheel are in motion
+        if (Mathf.Abs(wheels[i].wheelCollider.rpm) > 0.001f)
+        {
+          rollingResistanceMagnitude[i] = rollingResistanceCoefficient * normalForce[i];
+        }
+        else
+        {
+          rollingResistanceMagnitude[i] = 0f;
+        }
+
+        // Apply rolling resistance to the opposite direction of the wheel
+        // (?) In real-world physics calculation, the force is applied in the opposite of the wheel rolling direction,
+        //     where force would be in the forward rolling direction of the wheel to go backwards due to friction.
+        //     However, in case of simulation, force is directly applied backwards.
+        Vector3 rollingResistanceForce = -Mathf.Sign(wheels[i].wheelCollider.rpm) *
+                                            hit.forwardDir * rollingResistanceMagnitude[i];
+        rb.AddForceAtPosition(rollingResistanceForce, hit.point);
+
+        // DEBUGGING
+        //Debug.Log($"Spring Force (N): {springForce}," +
+        //          $"Damping Force: {dampingForce} ," +
+        //          $"Rolling Resistance Force (N): {rollingResistanceMagnitude[i]}");
+        // Visualize force acting against the road to move forward, opposite to the wheel's rolling direction due to friction
+        Debug.DrawRay(hit.point + new Vector3(0, wheelRadius / 2, 0),
+                      -rollingResistanceForce * lineScale,
+                      Color.red);
+      }
+    }
+  }
+
   // ====================================================================================================
   // AERODYNAMICS
+
   void Aerodynamics()
   {
-    // Disable rigidbody's drag
-    rb.linearDamping = 0f;
-    rb.angularDamping = 0f;
-
     // Rigidbody's magnitude of velocity (m/s)
     rbSpeed = rb.linearVelocity.magnitude;
 
     FrictionDrag();
     LiftDownforce();
-    RollingResistance();
   }
 
   void FrictionDrag()
@@ -627,8 +744,8 @@ public class CarController : MonoBehaviour
     Vector3 rearLiftForce = Vector3.up * rearLiftMagnitude;
 
     // Apply lift/downforce forces to front and rear axles relative to midpoint of car
-    Vector3 frontAxle = transform.TransformPoint(0f, 0f, 1.739395f);
-    Vector3 rearAxle = transform.TransformPoint(0f, 0f, -1.572661f);
+    Vector3 frontAxle = transform.TransformPoint(0f, 0f, frontAxleDistance);
+    Vector3 rearAxle = transform.TransformPoint(0f, 0f, -rearAxleDistance);
     // NOTE: Position is in world coordinates
     rb.AddForceAtPosition(frontLiftForce, frontAxle);
     rb.AddForceAtPosition(rearLiftForce, rearAxle);
@@ -639,74 +756,6 @@ public class CarController : MonoBehaviour
     Debug.DrawRay(rearAxle, rearLiftForce * lineScale, Color.cyan);
   }
 
-  void RollingResistance()
-  {
-    // Calculate average force on each wheel at rest
-    float chassisWeight = ladenMass * Physics.gravity.magnitude / wheels.Length;
-    float wheelWeight = wheelMass * Physics.gravity.magnitude;
-    float weightAtRest = chassisWeight + wheelWeight;
-
-    for (int i = 0; i < wheels.Length; i++)
-    {
-      // If wheel is grounded and moving, get current suspension compression/extension
-      if (wheels[i].wheelCollider.GetGroundHit(out WheelHit hit))
-      {
-        // Calculate current suspension distance
-        float distanceToGround = wheels[i].wheelCollider.transform.position.y - hit.point.y;
-        // Calculate suspension displacement length from the midpoint (how much the spring is pushed in)
-        // (!) Considers world space default wheel collider distance from the ground, to be wheel's radius
-        //     and half of the suspension length in runtime
-        suspensionDisplacement[i] = (wheelRadius + suspensionDistance / 2) - distanceToGround;
-
-        // Check if wheel is in motion
-        if (Mathf.Abs(wheels[i].wheelCollider.rpm) > 0.001f)
-        {
-          // Using Hooke's Law (F = -k * x) to calculate the force applied by the spring stiffness & dampening
-          // (?) The suspension displacement will reflect on the car's laden weight and any lift/downforce
-          float springForce = stiffness * suspensionDisplacement[i];
-          // Calculate suspension velocity (how fast the suspension is rebounding)
-          float susVelocity = (distanceToGround - previousSuspensionDisplacement[i]) / Time.fixedDeltaTime;
-          // Calculate damping force (F = -c * v), opposing force
-          float dampingForce = dampening * susVelocity;
-          // Calculate total suspension force by combining spring & damping forces
-          float suspensionForce = springForce + dampingForce;
-
-          // Calculate total normal forces with the wheel included
-          // (?) Clamp to 0 since spring's force tries to move upwards (compressing) if it's extended downwards beyond midpoint,
-          //     thus no rolling resistance since no force pushing against the ground, especially when the car is not grounded
-          float Fn = Mathf.Max(0, weightAtRest + suspensionForce);
-
-          // For damping force calculation
-          previousSuspensionDisplacement[i] = distanceToGround;
-
-          // Apply rolling resistance equation (Frr = Crr * Fn) depending on wheel's rotation direction
-          // (!) Rolling resistance to be applied in MotorsBrakes() to the wheel collider as brake torque to resist its motion
-          rollingResistanceMagnitude[i] = rollingResistanceCoefficient * Fn;
-
-          // Apply rolling resistance to the opposite direction of the wheel
-          // (?) In real-world physics calculation, the force is applied in the opposite of the wheel rolling direction,
-          //     where force would be in the forward rolling direction of the wheel to go backwards due to friction.
-          //     However, in case of simulation, force is directly applied backwards.
-          Vector3 rollingResistanceForce = -Mathf.Sign(wheels[i].wheelCollider.rpm) *
-                                           hit.forwardDir * rollingResistanceMagnitude[i];
-          rb.AddForceAtPosition(rollingResistanceForce, hit.point);
-
-          // DEBUGGING
-          //Debug.Log($"Spring Force (N): {springForce}," +
-          //          $"Damping Force: {dampingForce} ," +
-          //          $"Rolling Resistance Force (N): {rollingResistanceMagnitude[i]}");
-          // Visualize force acting against the road to move forward, opposite to the wheel's rolling direction due to friction
-          Debug.DrawRay(hit.point + new Vector3(0, wheelRadius / 2, 0),
-                        -rollingResistanceForce * lineScale,
-                        Color.red);
-        }
-        else
-        {
-          rollingResistanceMagnitude[i] = 0f;
-        }
-      }
-    }
-  }
   // ====================================================================================================
 
   void Unstuck()
@@ -758,6 +807,6 @@ public class CarController : MonoBehaviour
                     speedFactor, actualSpeedFactor, powerFactor, torqueFactor,
                     dragMagnitude, frontliftMagnitude, rearLiftMagnitude,
                     actualSpeed);
-    carGUI.WheelStats(wheels, suspensionDisplacement, rollingResistanceMagnitude);
+    carGUI.WheelStats(wheels, rollingResistanceMagnitude, normalForce, suspensionDisplacement);
   }
 }
