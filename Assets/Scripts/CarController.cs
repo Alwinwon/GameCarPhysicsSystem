@@ -69,6 +69,8 @@ public class CarController : MonoBehaviour
   [Tooltip("Tire friction factor.")]
   [Range(0.1f, 10f)]
   [SerializeField] float tireFriction = 1f;
+  [Tooltip("Estimated total rolling resistance coefficient (Crr) of each wheel.")]
+  [SerializeField] float rollingResistanceCoefficient = 0.015f;
 
   [Header("Suspensions")]
   [Tooltip("Maximum allowable displacement of suspension within car's wheel well (m).")]
@@ -108,11 +110,9 @@ public class CarController : MonoBehaviour
   [Tooltip("Estimated total influence area (A) of lift/downforce accessories of the car (m2).")]
   [SerializeField] float influenceArea = 2.7f;
   [Tooltip("Estimated total front axle lift(+)/downforce(-) coefficient (Cl) of the car.")]
-  [SerializeField] float frontLiftDownforceCoefficieint = 0.05f; // Positive for lift
+  [SerializeField] float frontLiftDownforceCoefficient = 0.05f; // Positive for lift
   [Tooltip("Estimated total rear axle lift(+)/downforce(-) coefficient (Cl) of the car.")]
-  [SerializeField] float rearLiftDownforceCoefficieint = -0.2f; // Negative for downforce (lip spoiler)
-  [Tooltip("Estimated total rolling resistance coefficient (Crr) of each wheel.")]
-  [SerializeField] float rollingResistanceCoefficient = 0.015f;
+  [SerializeField] float rearLiftDownforceCoefficient = -0.2f; // Negative for downforce (lip spoiler)
 
   [Header("Model Setup")]
   [Tooltip("Default model ground clearance to car's axle (m).")]
@@ -185,6 +185,7 @@ public class CarController : MonoBehaviour
     // Initialize Input Actions
     carControls = new CarInputActions();
   }
+
   void OnEnable()
   {
     carControls.Enable();
@@ -304,7 +305,7 @@ public class CarController : MonoBehaviour
     {
       // Assign wheelCollider carProperties for each wheel
       // (!) Ensure the set Edit > Project Settings > Time > Fixed Time step from 0.02 (default) to 0.004.
-      // (?) The default fixed timestep is too coarse for low-speed precision, leading to erractice motion
+      // (?) The default fixed timestep is too coarse for low-speed precision, leading to Edit > Project Settings > Time > Fixed Time step from 0.02 (default) to 0.004. motion
       wheel.wheelCollider.mass = wheelMass;
       wheel.wheelCollider.radius = wheelRadius;
       
@@ -312,6 +313,16 @@ public class CarController : MonoBehaviour
       // (?) Model Radius at Scale = 1 is 0.4075898f
       float wheelModelScale = wheelRadius / defaultWheelRadius;
       wheel.wheel.localScale = new Vector3(1f, wheelModelScale, wheelModelScale);
+
+      // Get the current friction settings
+      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
+      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
+      // Modify the stiffness values
+      frontFriction.stiffness = tireFriction;
+      sideFriction.stiffness = tireFriction;
+      // Apply the modified settings back to the wheel collider
+      wheel.wheelCollider.forwardFriction = frontFriction;
+      wheel.wheelCollider.sidewaysFriction = sideFriction;
     }
   }
 
@@ -339,16 +350,6 @@ public class CarController : MonoBehaviour
       spring.damper = dampening;
       // Apply the modified settings back to the wheel collider
       wheel.wheelCollider.suspensionSpring = spring;
-
-      // Get the current friction settings
-      WheelFrictionCurve frontFriction = wheel.wheelCollider.forwardFriction;
-      WheelFrictionCurve sideFriction = wheel.wheelCollider.sidewaysFriction;
-      // Modify the stiffness values
-      frontFriction.stiffness = tireFriction;
-      sideFriction.stiffness = tireFriction;
-      // Apply the modified settings back to the wheel collider
-      wheel.wheelCollider.forwardFriction = frontFriction;
-      wheel.wheelCollider.sidewaysFriction = sideFriction;
     }
   }
 
@@ -738,8 +739,8 @@ public class CarController : MonoBehaviour
   void LiftDownforce()
   {
     // Apply lift/downforce equation (Fd = 0.5 * p * Cl * A * v2)
-    frontliftMagnitude = 0.5f * airDensity * frontLiftDownforceCoefficieint * influenceArea * rbSpeed * rbSpeed;
-    rearLiftMagnitude = 0.5f * airDensity * rearLiftDownforceCoefficieint * influenceArea * rbSpeed * rbSpeed;
+    frontliftMagnitude = 0.5f * airDensity * frontLiftDownforceCoefficient * influenceArea * rbSpeed * rbSpeed;
+    rearLiftMagnitude = 0.5f * airDensity * rearLiftDownforceCoefficient * influenceArea * rbSpeed * rbSpeed;
     Vector3 frontLiftForce = Vector3.up * frontliftMagnitude;
     Vector3 rearLiftForce = Vector3.up * rearLiftMagnitude;
 
